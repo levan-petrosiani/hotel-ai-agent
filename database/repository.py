@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from typing import Optional
-from .models import RoomDB, GuestDB, ReservationDB, ChatSessionDB, ChatMessageDB
+from .models import RoomDB, GuestDB, ReservationDB, ChatSessionDB, ChatMessageDB, HITLSessionDB
 from models import Hotel, Room, Reservation
 from langchain_core.messages import HumanMessage, AIMessage
+from datetime import datetime, timedelta
 
 class HotelRepository:
     """All database operations for the hotel system."""
@@ -231,4 +232,48 @@ class HotelRepository:
                 total_revenue / len(reservations), 2
             ) if reservations else 0.0
         }
+    
+
+    def create_hitl_session(self, guest_user_id: str, guest_message: str, 
+                       reason: str, staff_msg_id: int) -> HITLSessionDB:
+        """Create a new HITL session."""
+        session = HITLSessionDB(
+            guest_user_id=guest_user_id,
+            guest_message=guest_message,
+            reason=reason,
+            staff_alert_msg_id=staff_msg_id,
+            status="pending"
+        )
+        self.db.add(session)
+        self.db.commit()
+        self.db.refresh(session)
+        return session
+
+    def get_pending_hitl_session(self, guest_user_id: str) -> Optional[HITLSessionDB]:
+        """Get pending HITL session for a guest."""
+        return self.db.query(HITLSessionDB).filter(
+            HITLSessionDB.guest_user_id == guest_user_id,
+            HITLSessionDB.status == "pending"
+        ).first()
+
+    def resolve_hitl_session(self, session_id: int, staff_response: str):
+        """Mark HITL session as resolved."""
+        session = self.db.query(HITLSessionDB).filter(
+            HITLSessionDB.id == session_id
+        ).first()
+        
+        if session:
+            session.status = "resolved"
+            session.resolved_at = datetime.now()
+            session.staff_response = staff_response
+            self.db.commit()
+
+    def timeout_old_sessions(self, minutes: int = 5):
+        """Mark old pending sessions as timeout."""
+        cutoff = datetime.now() - timedelta(minutes=minutes)
+        self.db.query(HITLSessionDB).filter(
+            HITLSessionDB.status == "pending",
+            HITLSessionDB.created_at < cutoff
+        ).update({"status": "timeout"})
+        self.db.commit()
 

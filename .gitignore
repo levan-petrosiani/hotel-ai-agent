@@ -8,6 +8,7 @@ venv/
 env/
 ENV/
 agents/hotel_agent_old.py
+project_structure.py
 
 # Environment variables
 .env

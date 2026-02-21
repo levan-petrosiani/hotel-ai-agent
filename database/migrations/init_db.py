@@ -44,7 +44,14 @@ def seed_rooms():
 
         print(f"✅ Seeded {len(default_rooms)} rooms!")
 
+def reset_database():
+    print("Resetting database...")
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    print("Database reset complete.")
+
 if __name__ == "__main__":
+    reset_database()
     init_db()
     seed_rooms()
     print("\n🏨 Database ready!")

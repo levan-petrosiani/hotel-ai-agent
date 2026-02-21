@@ -26,6 +26,9 @@ class Settings:
     "DATABASE_URL",
     "postgresql://postgres:postgres@localhost:5432/hotel_ai"
     )
+
+    # Manager's Telegram user ID
+    STAFF_TELEGRAM_ID = os.getenv("STAFF_TELEGRAM_ID")  
     
     @classmethod
     def validate(cls):

@@ -7,6 +7,8 @@ from langgraph.graph.message import add_messages
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from config.settings import settings
+from agents.hitl_detector import detect_hitl_need
+
 
 # Import tools (will be wrapped with hotel instance)
 from .tools import (
@@ -30,6 +32,11 @@ class HotelState(TypedDict):
     num_guests: int | None
     available_rooms: list | None
     reservation_confirmed: bool
+
+    # HITL fields
+    needs_human: bool
+    hitl_reason: str | None
+    waiting_for_staff: bool
 
 def create_hotel_tools(hotel: Hotel):
     """Create hotel-specific tools bound to a hotel instance."""
@@ -149,17 +156,45 @@ def create_hotel_agent(hotel: Hotel):
         response = llm_with_tools.invoke(messages)
         return {"messages": [response]}
     
+    # HITL detection node
+    def check_hitl(state: HotelState) -> HotelState:
+        """Check if human intervention is needed."""
+        if not state["messages"]:
+            return {"needs_human": False}
+        
+        last_user_msg = None
+        for msg in reversed(state["messages"]):
+            if isinstance(msg, HumanMessage):
+                last_user_msg = msg.content
+                break
+        
+        if not last_user_msg:
+            return {"needs_human": False}
+        
+        needs_human, reason = detect_hitl_need(last_user_msg)
+        
+        return {
+            "needs_human": needs_human,
+            "hitl_reason": reason,
+            "waiting_for_staff": needs_human
+        }
+    
     # Should continue decision
-    def should_continue(state: HotelState) -> Literal["tools", "end"]:
-        """Determine if we should continue to tools or end."""
+    def should_continue(state: HotelState) -> Literal["tools", "hitl", "end"]:
+        """Determine next step in the graph."""
+        
+        # If waiting for staff, pause
+        if state.get("waiting_for_staff"):
+            return "hitl"
+        
         last_message = state["messages"][-1]
         
         # If LLM makes a tool call, continue to tools
         if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             return "tools"
         
-        # Otherwise end
         return "end"
+    
     
     # Build the graph
     workflow = StateGraph(HotelState)
@@ -167,16 +202,23 @@ def create_hotel_agent(hotel: Hotel):
     # Add nodes
     workflow.add_node("agent", agent_node)
     workflow.add_node("tools", ToolNode(tools))
+    workflow.add_node("check_hitl", check_hitl)
     
     # Set entry point
-    workflow.set_entry_point("agent")
+    workflow.set_entry_point("check_hitl")
     
-    # Add edges
+    # Edges
+    workflow.add_conditional_edges(
+        "check_hitl",
+        lambda state: "hitl" if state.get("needs_human") else "agent"
+    )
+    
     workflow.add_conditional_edges(
         "agent",
         should_continue,
         {
             "tools": "tools",
+            "hitl": END,
             "end": END
         }
     )
@@ -188,47 +230,6 @@ def create_hotel_agent(hotel: Hotel):
     app = workflow.compile()
     
     return app
-
-# def run_hotel_agent(hotel: Hotel, user_message: str, chat_history: list = None):
-#     """
-#     Run the hotel agent with a user message.
-    
-#     Args:
-#         hotel: Hotel instance
-#         user_message: User's message
-#         chat_history: Previous conversation messages
-        
-#     Returns:
-#         Agent's response and updated chat history
-#     """
-#     app = create_hotel_agent(hotel)
-    
-#     # Initialize state
-#     messages = chat_history if chat_history else []
-#     messages.append(HumanMessage(content=user_message))
-    
-#     state = {
-#         "messages": messages,
-#         "hotel": hotel,
-#         "guest_name": None,
-#         "email": None,
-#         "phone": None,
-#         "room_number": None,
-#         "check_in": None,
-#         "check_out": None,
-#         "num_guests": None,
-#         "available_rooms": None,
-#         "reservation_confirmed": False
-#     }
-    
-#     # Run the agent
-#     result = app.invoke(state)
-    
-#     # Get the last AI message
-#     ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
-#     last_response = ai_messages[-1].content if ai_messages else "I apologize, I couldn't process that."
-    
-#     return last_response, result["messages"]
 
 def run_hotel_agent(hotel: Hotel, user_message: str, chat_history: list = None):
     app = create_hotel_agent(hotel)
