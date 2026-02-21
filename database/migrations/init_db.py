@@ -50,7 +50,7 @@ def reset_database():
     Base.metadata.create_all(engine)
     print("Database reset complete.")
 
-if __name__ == "__main__":
+def create_db():
     reset_database()
     init_db()
     seed_rooms()

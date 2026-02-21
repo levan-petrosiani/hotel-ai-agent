@@ -21,6 +21,7 @@ from config.settings import settings
 from database.connection import SessionLocal
 from database.repository import HotelRepository
 from database.models import ReservationDB, HITLSessionDB
+from database.migrations.init_db import create_db
 
 from agents.hitl_detector import detect_hitl_need
 import asyncio
@@ -356,6 +357,7 @@ async def check_hitl_timeout(guest_id: str, context: ContextTypes.DEFAULT_TYPE,
 
 def main():
     """Start the Telegram bot."""
+
     token = settings.TELEGRAM_BOT_TOKEN
 
     if not token:
@@ -387,4 +389,5 @@ def main():
 
 
 if __name__ == "__main__":
+    create_db()
     main()
