@@ -8,6 +8,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from config.settings import settings
 from agents.hitl_detector import detect_hitl_need
+from datetime import datetime
 
 
 # Import tools (will be wrapped with hotel instance)
@@ -145,6 +146,8 @@ def create_hotel_agent(hotel: Hotel):
 
     Your job is to help guests check availability, make reservations, cancel bookings, and answer questions.
     Always be friendly and professional.
+    Today's date: {datetime.now().strftime('%d/%m/%Y')}
+    When user says "tomorrow", calculate the date.
 
     When you need to use a tool, just call it directly. The system will handle the rest."""
     )
