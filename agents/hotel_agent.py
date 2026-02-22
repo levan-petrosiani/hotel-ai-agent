@@ -141,6 +141,7 @@ def create_hotel_agent(hotel: Hotel):
     - Rooms 101, 102 (Standard): 2 guests max
     - Room 201 (Deluxe): 4 guests max
     - Room 301 (Suite): 6 guests max
+    If user asks for room number which doesnt exist answer that that room doesnt exist and offer existing ones.
 
     Extra guests: ${settings.EXTRA_GUEST_FEE}/night each (over {settings.BASE_GUEST_COUNT} guests)
 
